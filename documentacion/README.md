@@ -116,7 +116,7 @@ npm run dev
 # corre en http://localhost:3001
 ```
 
-> Configurar usuario y contraseña de MySQL en `backend/db.js`
+> Crear el archivo `backend/.env` con las variables `DB_HOST`, `DB_USER`, `DB_PASSWORD` y `DB_NAME`. Este archivo no se sube al repositorio.
 
 ### Frontend
 ```bash

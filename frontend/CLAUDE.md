@@ -1,98 +1,75 @@
-# Frontend — Recetario
+# Backend — Recetario
 
 ## Stack
-- React 18 + Vite
-- React Router DOM v6
-- Bootstrap 5 (via npm)
-- SB Admin template (archivos estáticos en /public)
+- Node.js + Express
+- mysql2 (con pool de conexiones y promesas)
+- dotenv (variables de entorno)
+- nodemon para desarrollo
 
 ## Comandos
 ```bash
-npm run dev     # desarrollo
-npm run build   # producción
+npm run dev   # desarrollo (nodemon)
+npm start     # producción
 ```
 
-El frontend corre en `http://localhost:5173`.
-El backend debe estar corriendo en `http://localhost:3001`.
+El servidor corre en `http://localhost:3001`.
 
 ## Estructura
 ```
-frontend/
-  ├── public/
-  │     ├── assets/
-  │     ├── css/
-  │     │     └── styles.css       # CSS del template SB Admin
-  │     └── js/
-  ├── src/
-  │     ├── components/
-  │     │     ├── Layout.jsx        # Navbar + Sidebar + Footer (envuelve todas las páginas)
-  │     │     └── ModalConfirmar.jsx # Modal reutilizable de confirmación
-  │     ├── pages/
-  │     │     ├── ListaRecetas.jsx  # Página principal con tabla y filtro
-  │     │     ├── FormReceta.jsx    # Alta y edición de recetas (mismo componente)
-  │     │     └── DetalleReceta.jsx # Vista detallada de una receta
-  │     ├── services/
-  │     │     └── api.js            # Todas las llamadas al backend centralizadas
-  │     ├── App.jsx                 # Configuración de rutas
-  │     └── main.jsx                # Entry point, importa Bootstrap
-  ├── index.html
+backend/
+  ├── routes/
+  │     ├── categorias.js   # GET /categorias
+  │     └── recetas.js      # CRUD /recetas
+  ├── db.js                 # Pool de conexión MySQL
+  ├── index.js              # Entry point, registro de rutas
   └── package.json
 ```
 
-## Rutas
+## Conexión a la base de datos
+Archivo `db.js`. Usa `mysql2/promise` con `createPool`.
+Las credenciales se leen desde variables de entorno usando `dotenv`.
 
-| Path | Componente | Descripción |
-|------|------------|-------------|
-| `/` | `ListaRecetas` | Listado de recetas activas con filtro por categoría |
-| `/nueva` | `FormReceta` | Formulario de alta |
-| `/editar/:id` | `FormReceta` | Formulario de edición pre-cargado |
-| `/receta/:id` | `DetalleReceta` | Vista detallada de una receta |
+Crear un archivo `.env` en la raíz de `backend/` con estas variables:
+```
+DB_HOST=localhost
+DB_USER=tu_usuario
+DB_PASSWORD=tu_contraseña
+DB_NAME=recetario
+```
 
-## Componentes y páginas
+> El archivo `.env` está en `.gitignore` y nunca se sube al repositorio.
 
-### Layout.jsx
-Envuelve todas las páginas. Contiene navbar superior, sidebar con links de navegación y footer. Recibe `{children}` que es el contenido de cada página.
+## Tablas involucradas
+- `categorias` — id_categoria, nombre, activo
+- `receta` — id_receta, nombre, descripcion, ingredientes, pasos, tiempo_preparacion, id_categoria, activo, fecha_creacion
 
-### ModalConfirmar.jsx
-Modal reutilizable de confirmación. Recibe tres props:
-- `mensaje` — texto que muestra el modal
-- `onConfirmar` — función que se ejecuta al confirmar
-- `onCancelar` — función que se ejecuta al cancelar
+> Nota: la tabla se llama `receta` (singular), no `recetas`.
 
-### ListaRecetas.jsx
-- Trae recetas y categorías en paralelo con `Promise.all`
-- Combo de filtro por categoría llenado desde la BD
-- Botones de editar (navega a `/editar/:id`) y dar de baja (abre modal)
-- Usa `recetaSeleccionada` para saber qué receta se está dando de baja
+## Endpoints
 
-### FormReceta.jsx
-- Detecta si es alta o edición según si existe `id` en los params (`useParams`)
-- En edición pre-carga el formulario con `getReceta(id)`
-- El combo de categorías siempre se llena desde la BD
-- Al guardar navega automáticamente al listado
+| Método | Ruta                | Descripción                        |
+|--------|---------------------|------------------------------------|
+| GET    | `/categorias`       | Lista categorías activas           |
+| GET    | `/recetas`          | Lista recetas activas con JOIN     |
+| GET    | `/recetas/:id`      | Detalle completo de una receta     |
+| POST   | `/recetas`          | Crear receta (body JSON)           |
+| PUT    | `/recetas/:id`      | Editar receta (body JSON)          |
+| PUT    | `/recetas/:id/baja` | Baja lógica (activo = 0)           |
 
-### DetalleReceta.jsx
-- Muestra todos los campos de la receta
-- Ingredientes y pasos se renderizan línea por línea usando `split('\n')`
-- Tiene botones de editar y dar de baja con modal de confirmación
+## Convenciones
+- Baja lógica: campo `activo` (BOOL). Nunca se eliminan registros.
+- Validación mínima en el backend: `nombre` e `id_categoria` son obligatorios.
+- Los `?` en las queries previenen SQL injection.
+- `result.affectedRows === 0` se usa para detectar registros no encontrados en UPDATE.
 
-## Hooks utilizados por página
-
-| Página | Hooks |
-|--------|-------|
-| `ListaRecetas` | `useState`, `useEffect`, `useNavigate` |
-| `FormReceta` | `useState`, `useEffect`, `useParams`, `useNavigate` |
-| `DetalleReceta` | `useState`, `useEffect`, `useParams`, `useNavigate` |
-
-## Comunicación con el backend
-Toda la comunicación está centralizada en `src/services/api.js`.
-La URL base es `http://localhost:3001`.
-
-| Función | Método | Endpoint |
-|---------|--------|----------|
-| `getCategorias()` | GET | `/categorias` |
-| `getRecetas()` | GET | `/recetas` |
-| `getReceta(id)` | GET | `/recetas/:id` |
-| `crearReceta(data)` | POST | `/recetas` |
-| `editarReceta(id, data)` | PUT | `/recetas/:id` |
-| `bajaReceta(id)` | PUT | `/recetas/:id/baja` |
+## Body esperado en POST y PUT /recetas
+```json
+{
+  "nombre": "Nombre de la receta",
+  "descripcion": "Descripción breve",
+  "ingredientes": "Un ingrediente por línea",
+  "pasos": "1. Paso uno\n2. Paso dos",
+  "tiempo_preparacion": 30,
+  "id_categoria": 3
+}
+```
